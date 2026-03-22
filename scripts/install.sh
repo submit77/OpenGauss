@@ -37,7 +37,8 @@ GAUSS_HOME="${GAUSS_HOME:-$HOME/.gauss}"
 WORKSPACE_DIR="${GAUSS_WORKSPACE_DIR:-$HOME/GaussWorkspace}"
 RECREATE_VENV=false
 SKIP_SYSTEM_PACKAGES=false
-CREATE_WORKSPACE=false
+CREATE_WORKSPACE=true
+AUTO_LAUNCH_SESSION=true
 
 OS=""
 DISTRO=""
@@ -62,9 +63,11 @@ Options:
   --gauss-home PATH       Override the Gauss home directory (default: ~/.gauss)
   --workspace-dir PATH    Override the prewarmed Lean workspace path
                           (default: ~/GaussWorkspace)
+  --no-workspace          Skip creating/reusing the default Lean workspace project
   --skip-system-packages  Do not run apt-get even on Debian/Ubuntu
-  --with-workspace        Also create a prewarmed Lean+Mathlib workspace
-                          (downloads ~2 GB, adds 5-15 min)
+  --with-workspace        Backward-compatible alias for the default
+                          prewarmed Lean+Mathlib workspace behavior
+  --no-launch             Do not auto-launch gauss-open-session after install
   --recreate-venv         Remove and recreate the repository virtualenv
   -h, --help              Show this help
 
@@ -81,6 +84,7 @@ Behavior:
   Exported non-empty provider keys are written to ~/.gauss/.env.
   Unset provider keys leave existing ~/.gauss/.env values untouched.
   Export a provider key as an empty string to clear the staged value.
+  Interactive installs auto-launch gauss-open-session unless --no-launch is set.
 TXT
 }
 
@@ -130,12 +134,20 @@ parse_args() {
                 WORKSPACE_DIR="$2"
                 shift 2
                 ;;
+            --no-workspace)
+                CREATE_WORKSPACE=false
+                shift
+                ;;
             --skip-system-packages)
                 SKIP_SYSTEM_PACKAGES=true
                 shift
                 ;;
             --with-workspace)
                 CREATE_WORKSPACE=true
+                shift
+                ;;
+            --no-launch)
+                AUTO_LAUNCH_SESSION=false
                 shift
                 ;;
             --recreate-venv)
@@ -579,7 +591,7 @@ sync_optional_provider_keys() {
 
 ensure_workspace() {
     if [ "$CREATE_WORKSPACE" != true ]; then
-        log_info "Skipping Lean workspace (use --with-workspace to create one, or /project create inside Gauss)"
+        log_info "Skipping the default Lean workspace (--no-workspace requested)."
         return
     fi
 
@@ -608,8 +620,8 @@ ensure_workspace() {
 This Lean workspace is prewarmed and already registered as the active Gauss project.
 
 Quickstart:
-1. Run `gauss-open-session` for the batteries-included launcher.
-2. Or launch `gauss` directly inside this workspace.
+1. Interactive installs normally drop you straight into this project.
+2. Reopen it later with `gauss-open-session`, or launch `gauss` directly here.
 3. Use `/prove`, `/draft`, `/autoprove`, `/formalize`, `/autoformalize`, or `/swarm`.
 4. Keep paper notes, extracted statements, and scratch proofs in this project.
 TXT
@@ -807,7 +819,7 @@ guide_html = f"""<!DOCTYPE html>
     <a href="https://github.com/math-inc/opengauss" target="_blank" rel="noreferrer">Open repo</a>
   </header>
   <section class="hero">
-    <p>This local installer uses the checked-out <code>math-inc/opengauss</code> repository at <code>{escape(str(repo_root))}</code> and currently resolves to <code>{repo_head}</code>. It preloads Lean 4, Claude Code, OpenAI Codex, the Math Inc skin, and a ready project at <code>{escape(str(workspace_dir))}</code>. Run <code>gauss-open-session</code> for the batteries-included launcher or <code>gauss</code> directly if you prefer to skip the session wrapper.</p>
+    <p>This local installer uses the checked-out <code>math-inc/opengauss</code> repository at <code>{escape(str(repo_root))}</code> and currently resolves to <code>{repo_head}</code>. It preloads Lean 4, Claude Code, OpenAI Codex, the Math Inc skin, and a ready project at <code>{escape(str(workspace_dir))}</code>. Interactive installs auto-launch <code>gauss-open-session</code>; later, reopen it with that helper or run <code>gauss</code> directly inside the project.</p>
   </section>
   <section class="grid">
     <div class="card">
@@ -1091,6 +1103,13 @@ if [ "${1:-}" = "--print-summary" ]; then
   shift
 fi
 
+workspace_label="$WORKSPACE_DIR"
+project_manifest_status="initialized"
+if [ ! -d "$WORKSPACE_DIR" ]; then
+  workspace_label="(none preconfigured)"
+  project_manifest_status="not initialized"
+fi
+
 staged_keys="none"
 if [ -n "${OPENROUTER_API_KEY:-}" ] || [ -n "${OPENAI_API_KEY:-}" ] || [ -n "${ANTHROPIC_API_KEY:-}" ]; then
   staged_keys=""
@@ -1100,13 +1119,12 @@ if [ -n "${OPENROUTER_API_KEY:-}" ] || [ -n "${OPENAI_API_KEY:-}" ] || [ -n "${A
   staged_keys="${staged_keys# }"
 fi
 
-interactive_provider="none staged"
-launch_gauss=0
+interactive_provider="No staged main-provider key configured yet."
+provider_setup_note=""
 if provider_status="$(gauss-configure-main-provider auto 2>&1)"; then
   interactive_provider="$provider_status"
-  launch_gauss=1
 else
-  interactive_provider="$provider_status"
+  provider_setup_note="$provider_status"
 fi
 
 clear >/dev/null 2>&1 || true
@@ -1116,9 +1134,9 @@ Open Gauss workflow installer is ready.
 Repo: $REPO_ROOT
 Branch: $(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || printf 'detached')
 Commit: $(git -C "$REPO_ROOT" rev-parse --short=12 HEAD 2>/dev/null || printf 'unknown')
-Lean project: $WORKSPACE_DIR
+Lean project: $workspace_label
 Guide: __GUIDE_PATH__
-Gauss project manifest: initialized
+Gauss project manifest: $project_manifest_status
 Default managed backend: claude-code
 Default auth mode: auto
 Main interactive provider: ${interactive_provider}
@@ -1145,46 +1163,35 @@ Backend helpers:
 Interactive provider notes:
   Auto-selection priority: OpenRouter, then Anthropic, then OpenAI-compatible.
   OpenRouter affects the main chat UI only; managed workflow backends stay separate.
+  Managed workflows still run even if no main chat provider is configured yet.
   PROMPT_TOOLKIT_NO_CPR=1 is enabled to avoid CPR warnings inside tmux.
 
 The local guide is written to __GUIDE_PATH__.
 TXT
 
+if [ -n "$provider_setup_note" ]; then
+  cat <<TXT
+
+Main provider setup note:
+  $provider_setup_note
+TXT
+fi
+
 if [ "$print_summary" -eq 1 ]; then
   exit 0
 fi
 
-cd "$WORKSPACE_DIR"
-if [ "$launch_gauss" -eq 1 ]; then
-  gauss "$@" || true
-  if [ -t 0 ] && [ -t 1 ]; then
-    exec bash -i
-  fi
-else
-  cat <<TXT
-
-Gauss was not auto-launched because no interactive provider could be configured.
-
-To make the main chat UI ready, export one of:
-  OPENROUTER_API_KEY
-  ANTHROPIC_API_KEY
-  OPENAI_API_KEY
-
-Then rerun one of:
-  gauss-configure-main-provider auto
-  gauss-use-openrouter-key
-  gauss-use-anthropic-key
-  gauss-use-openai-key
-
-You can still run backend-only setup via:
-  gauss-use-claude-backend
-  gauss-use-codex-backend
-TXT
-  if [ -t 0 ] && [ -t 1 ]; then
-    exec bash -i
-  fi
-  exit 1
+if [ -d "$WORKSPACE_DIR" ]; then
+  cd "$WORKSPACE_DIR"
 fi
+status=0
+if ! gauss "$@"; then
+  status=$?
+fi
+if [ -t 0 ] && [ -t 1 ]; then
+  exec bash -i
+fi
+exit "$status"
 """,
     "gauss-open-session": """#!/usr/bin/env bash
 set -euo pipefail
@@ -1235,7 +1242,27 @@ auto_configure_main_provider() {
     fi
 }
 
+launch_post_install_session() {
+    if [ "$AUTO_LAUNCH_SESSION" != true ]; then
+        log_info "Skipping automatic session launch (--no-launch requested)."
+        return
+    fi
+
+    if ! [ -t 0 ] || ! [ -t 1 ]; then
+        log_info "Skipping automatic session launch (no interactive terminal detected)."
+        return
+    fi
+
+    log_success "Launching the workflow session in $WORKSPACE_DIR"
+    exec "$HOME/.local/bin/gauss-open-session"
+}
+
 print_summary() {
+    local workspace_ready=false
+    if [ -d "$WORKSPACE_DIR" ]; then
+        workspace_ready=true
+    fi
+
     echo
     echo -e "${GREEN}${BOLD}"
     echo "┌─────────────────────────────────────────────────────────┐"
@@ -1247,17 +1274,21 @@ print_summary() {
     echo "  Repo:       $REPO_ROOT"
     echo "  Venv:       $VENV_DIR"
     echo "  Gauss home: $GAUSS_HOME"
-    if [ -d "$WORKSPACE_DIR" ] && [ "$CREATE_WORKSPACE" = true ]; then
+    if [ "$workspace_ready" = true ]; then
         echo "  Workspace:  $WORKSPACE_DIR"
     fi
     echo "  Guide:      $GUIDE_DIR/index.html"
     echo
     echo -e "${CYAN}${BOLD}Next Steps:${NC}"
     echo "  1. Reload your shell:  source ~/.zshrc"
-    echo "  2. Run the setup wizard: gauss setup"
-    echo "  3. Start chatting:      gauss"
-    echo
-    echo "  Inside Gauss, use /project create <path> to create a Lean project."
+    echo "  2. Open the launcher:  gauss-open-session"
+    if [ "$workspace_ready" = true ]; then
+        echo "  3. Start in the ready project at $WORKSPACE_DIR"
+        echo
+        echo "  If you want a different project, use /project use <path> inside Gauss."
+    else
+        echo "  3. Create or select a project with /project create or /project use"
+    fi
     echo
     echo -e "${CYAN}${BOLD}Helper Commands:${NC}"
     echo "  gauss-configure-main-provider [auto|openrouter|anthropic|openai]"
@@ -1270,9 +1301,11 @@ print_summary() {
     echo
     echo -e "${CYAN}${BOLD}Notes:${NC}"
     echo "  - The installer keeps code in your existing repository checkout."
+    echo "  - The installer preconfigures $WORKSPACE_DIR as the initial Gauss project by default."
     echo "  - The local guide is written to $GUIDE_DIR/index.html."
+    echo "  - Interactive installs auto-launch gauss-open-session unless you pass --no-launch."
+    echo "  - Use --no-workspace if you do not want the default prewarmed project."
     echo "  - No Morph iframe is exposed automatically; use gauss-open-guide if you want the local guide in a browser."
-    echo "  - No tmux session is opened during install; use gauss-open-session when you want the workflow launcher."
 }
 
 main() {
@@ -1299,18 +1332,8 @@ main() {
     ensure_shell_runtime_block
     write_helper_assets
     auto_configure_main_provider
+    launch_post_install_session
     print_summary
-    run_setup_wizard
-}
-
-run_setup_wizard() {
-    echo
-    read -p "Would you like to run the setup wizard now? (configure API keys + model) [Y/n] " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]] || [[ -z $REPLY ]]; then
-        echo
-        "$VENV_PYTHON" -m gauss_cli.main setup
-    fi
 }
 
 main "$@"

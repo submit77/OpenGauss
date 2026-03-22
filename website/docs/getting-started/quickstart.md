@@ -13,21 +13,19 @@ description: "Install Gauss, select a project, and launch the managed Lean prove
 ./scripts/install.sh
 ```
 
-The installer targets Linux checkouts, defaults runtime state to `~/.gauss/`, exposes `gauss` via `~/.local/bin/gauss`, and prewarms `~/GaussWorkspace`. Run `gauss-open-session` if you want the batteries-included launcher; run `gauss` directly if you prefer the raw CLI.
+The installer targets Linux checkouts, defaults runtime state to `~/.gauss/`, exposes `gauss` via `~/.local/bin/gauss`, prewarms `~/GaussWorkspace`, and registers it as the initial project. Interactive installs finish by opening `gauss-open-session`; if you run headless or pass `--no-launch`, reopen that launcher manually.
 
 ## 2. Open the CLI
 
 ```bash
-gauss
+gauss-open-session
 ```
 
-## 3. Select the active project
+## 3. The initial project is already ready
 
-```text
-/project init
-```
+The installer preconfigures `~/GaussWorkspace` as the active Lean project for the managed workflows.
 
-Or point Gauss at an existing project:
+If you want to switch to an existing project:
 
 ```text
 /project use /path/to/project

@@ -36,7 +36,8 @@ cd "$REPO_ROOT"
 export OPENAI_API_KEY
 ./scripts/install.sh \
     --gauss-home "$GAUSS_HOME" \
-    --workspace-dir "$WORKSPACE_DIR"
+    --workspace-dir "$WORKSPACE_DIR" \
+    --no-launch
 
 export PATH="$HOME/.local/bin:$REPO_ROOT/venv/bin:$HOME/.elan/bin:$PATH"
 export GAUSS_HOME
@@ -101,7 +102,8 @@ unset OPENAI_API_KEY OPENROUTER_API_KEY ANTHROPIC_API_KEY
 ./scripts/install.sh \
     --gauss-home "$GAUSS_HOME" \
     --workspace-dir "$WORKSPACE_DIR" \
-    --skip-system-packages
+    --skip-system-packages \
+    --no-launch
 grep -F 'SMOKE_RERUN_MARKER' "$WORKSPACE_DIR/PAPER.md" >/dev/null || die "expected PAPER.md marker to survive rerun"
 assert_exists "$WORKSPACE_DIR/KEEP_ME.txt"
 grep -F 'OPENAI_API_KEY="dummy-installer-key"' "$GAUSS_HOME/.env" >/dev/null || die "expected staged OPENAI_API_KEY to be preserved on rerun"

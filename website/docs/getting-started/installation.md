@@ -14,6 +14,7 @@ description: "Install Gauss from a Linux repository checkout."
 ```
 
 This repository-local installer targets Linux checkouts, with Ubuntu, Debian, and WSL as the primary supported environments. It keeps code in your existing checkout, writes runtime state to `~/.gauss/`, exposes `gauss` via `~/.local/bin/gauss`, and prewarms `~/GaussWorkspace`.
+When the installer runs in an interactive terminal, it finishes by opening `gauss-open-session` in that preconfigured project.
 
 ## Compatibility Behavior
 
@@ -23,14 +24,16 @@ This repository-local installer targets Linux checkouts, with Ubuntu, Debian, an
 
 ## After Install
 
+If you ran the installer headlessly or passed `--no-launch`, reopen the workflow session manually:
+
 ```bash
-gauss
+gauss-open-session
 ```
 
-Inside the CLI, start by selecting a project:
+The default `~/GaussWorkspace` project is already initialized and selected for the managed Lean workflows. If you want to switch to a different project, use:
 
 ```text
-/project init
+/project use /path/to/project
 ```
 
 ## Windows

@@ -35,13 +35,13 @@ The installer will:
 3. Create a Python virtualenv and install Gauss
 4. Link the `gauss` command to `~/.local/bin/gauss`
 5. Set up `~/.gauss/` for runtime config and secrets
-6. Run the setup wizard to configure your API keys and model
+6. Preconfigure `~/GaussWorkspace` as the initial project and, in interactive terminals, launch the workflow session
 
-After install, reload your shell and start Gauss:
+After install, interactive terminals drop straight into the workflow launcher. If you ran headless or passed `--no-launch`, reload your shell and reopen it manually:
 
 ```bash
 source ~/.zshrc   # or ~/.bashrc
-gauss
+gauss-open-session
 ```
 ## Configuration
 
@@ -55,9 +55,11 @@ If you prefer to run models locally (e.g., using a local GPU) to save on API cos
 ### Options
 
 ```
-./scripts/install.sh --with-workspace    # Also create a prewarmed Lean+Mathlib workspace (~2 GB download)
+./scripts/install.sh --with-workspace        # Alias for the default prewarmed workspace behavior
+./scripts/install.sh --no-workspace          # Skip creating/reusing the default Lean workspace project
+./scripts/install.sh --no-launch             # Install without auto-opening the workflow launcher
 ./scripts/install.sh --skip-system-packages  # Skip Homebrew/apt package installation
-./scripts/install.sh --recreate-venv     # Force-recreate the Python virtualenv
+./scripts/install.sh --recreate-venv         # Force-recreate the Python virtualenv
 ```
 
 ### Updating
@@ -71,9 +73,9 @@ gauss update
 ## Quick start
 
 ```
-gauss                         # Launch the CLI
-/project create ~/my-project  # Create a new Lean project
+gauss-open-session            # Reopen the workflow launcher if needed
 /prove 1+1=2                  # Spawn a proving agent
+/draft "Theorem 3.2"          # Draft the next statement inside the ready project
 /swarm                        # See running agents
 ```
 

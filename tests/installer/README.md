@@ -18,5 +18,6 @@ Current scenarios:
   - starts from the stock Ubuntu base image
   - exercises `./scripts/install.sh` from a mounted git checkout
   - verifies the installer bootstraps its own Debian/Ubuntu prerequisites
+  - uses `--no-launch` because the smoke runs headlessly
   - stages a dummy `OPENAI_API_KEY` to test non-interactive provider setup
   - verifies the workflow-derived workspace, config, guide, and helper scripts
