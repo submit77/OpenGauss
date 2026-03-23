@@ -66,3 +66,28 @@ Gauss checks these before launching a managed Lean workflow session:
 - the current directory is inside a Lean project
 
 If a prerequisite is missing, Gauss fails before handoff and explains the reason.
+
+## Managed Claude Auth Troubleshooting
+
+Managed Lean workflows run Claude in a staged managed home, not your real shell home.
+
+- real credentials: `~/.claude/.credentials.json`
+- managed runtime home: `~/.gauss/autoformalize/claude-code/managed/claude-home`
+
+So `claude auth status` in your regular shell can disagree with the managed run.
+
+Check managed auth directly:
+
+```bash
+HOME="$HOME/.gauss/autoformalize/claude-code/managed/claude-home" claude auth status
+```
+
+If managed auth is missing, either:
+
+1. log in for the managed runtime path, or
+2. switch managed auth mode to API key and set `ANTHROPIC_API_KEY` in `~/.gauss/.env`:
+
+```bash
+gauss config set gauss.autoformalize.auth_mode api-key
+```
+

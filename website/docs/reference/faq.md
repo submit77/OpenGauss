@@ -173,6 +173,22 @@ gauss config set OPENROUTER_API_KEY sk-or-v1-xxxxxxxxxxxx
 Make sure the key matches the provider. An OpenAI key won't work with OpenRouter and vice versa. Check `~/.gauss/.env` for conflicting entries.
 :::
 
+#### Managed Claude workflow says "Not logged in" even though `~/.claude/.credentials.json` exists
+
+**Cause:** Managed Lean workflows run Claude in a staged managed home (`~/.gauss/autoformalize/claude-code/managed/claude-home`), and stale local credential files can shadow working env-token auth in `auto` mode.
+
+**Solution:**
+```bash
+# Check auth in the managed runtime home
+HOME="$HOME/.gauss/autoformalize/claude-code/managed/claude-home" claude auth status
+
+# Prefer env token path for managed sessions
+# (set a valid CLAUDE_CODE_OAUTH_TOKEN in ~/.gauss/.env first)
+gauss config set gauss.autoformalize.auth_mode auto
+```
+
+If needed, remove or back up stale `~/.claude/.credentials.json` so managed sessions use the configured env token path.
+
 #### Model not available / model not found
 
 **Cause:** The model identifier is incorrect or not available on your provider.

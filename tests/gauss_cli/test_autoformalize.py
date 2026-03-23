@@ -542,6 +542,53 @@ def test_build_claude_runtime_login_mode_strips_auth_env(monkeypatch, tmp_path: 
     assert "ANTHROPIC_API_KEY" not in runtime.child_env
 
 
+def test_build_claude_runtime_prefers_explicit_auth_env_over_local_login(monkeypatch, tmp_path: Path):
+    shared_bundle = _shared_bundle(tmp_path)
+    workflow = _workflow("/formalize")
+    installed_plugin_root = (
+        tmp_path
+        / "managed"
+        / "claude-home"
+        / ".claude"
+        / "plugins"
+        / "cache"
+        / "lean4-skills"
+        / "lean4"
+        / "4.4.0"
+    )
+    (installed_plugin_root / "skills" / "lean4").mkdir(parents=True)
+
+    # Simulate stale local login credentials in the real home.
+    credentials_dir = shared_bundle.real_home / ".claude"
+    credentials_dir.mkdir(parents=True)
+    (credentials_dir / ".credentials.json").write_text(
+        json.dumps({"claudeAiOauth": {"accessToken": "stale-local-token"}}),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(autoformalize, "_require_executable", lambda name, _msg, _env: f"/usr/bin/{name}")
+    monkeypatch.setattr(autoformalize, "_claude_permission_args", lambda: ("--dangerously-skip-permissions",))
+    monkeypatch.setattr(autoformalize, "_install_managed_claude_plugin", lambda **_kwargs: installed_plugin_root)
+
+    runtime = autoformalize._build_claude_runtime(
+        auth_mode="auto",
+        user_instruction=workflow.workflow_args,
+        workflow=workflow,
+        base_environment={
+            "HOME": str(shared_bundle.real_home),
+            "PATH": "/usr/bin",
+            "CLAUDE_CODE_OAUTH_TOKEN": "fresh-env-token",
+        },
+        include_persisted_env=False,
+        shared_bundle=shared_bundle,
+    )
+
+    # Explicit auth env should win over local staged login credentials.
+    assert runtime.child_env["CLAUDE_CODE_OAUTH_TOKEN"] == "fresh-env-token"
+    assert "ANTHROPIC_API_KEY" not in runtime.child_env
+    assert not (runtime.managed_context.backend_home / ".claude" / ".credentials.json").exists()
+
+
 def test_build_codex_runtime_stages_skill_mcp_and_api_key_auth(monkeypatch, tmp_path: Path):
     shared_bundle = _shared_bundle(tmp_path, backend_name="codex")
     workflow = _workflow("/autoprove", "--max-cycles=4")

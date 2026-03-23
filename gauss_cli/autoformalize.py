@@ -743,12 +743,15 @@ def _build_claude_runtime(
     auth_env: dict[str, str] = {}
 
     if auth_mode == "auto":
-        if has_local_login or has_local_api_key:
+        # Prefer explicitly resolved auth env (e.g. CLAUDE_CODE_OAUTH_TOKEN)
+        # over local staged login files. This avoids stale local credentials
+        # shadowing a fresh token in WSL/headless setups.
+        if resolved_auth_env:
+            auth_env = resolved_auth_env
+        elif has_local_login or has_local_api_key:
             copy_oauth_credentials = has_local_login
             copy_local_api_key = has_local_api_key
             strip_child_auth_env = True
-        elif resolved_auth_env:
-            auth_env = resolved_auth_env
         else:
             raise AutoformalizePreflightError(
                 "Claude Code auth not found. Run `claude auth login`, save `ANTHROPIC_API_KEY`, "
